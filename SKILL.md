@@ -18,3 +18,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<本 Skill 目录>\scri
 令牌由用户在 PowerShell 隐藏输入提示处粘贴。不要要求用户把令牌发到聊天，不要把它放在命令行参数、Skill 文件、脚本、日志或 Git 仓库。看到 `PS ...>` 提示符时不要单独粘贴令牌，那表示安装器已经退出。安装失败时报告具体步骤和非敏感错误；不把 Git/Python 检查通过当作整个安装完成。
 
 安装器仅安装学习规则同步与 WB Skill，不签发商业授权、不绑定 Wildberries 店铺，也不执行商品上架。安装后如需这些业务操作，走原有 WB Skill 的授权流程。
+
+### 令牌与安装排查提示
+- 设备令牌严格为 43 位（`^[A-Za-z0-9_-]{43}$`），切勿带入 `令牌：` 前缀或误填 WB 店铺 API 密钥。
+- 安装脚本兼容 Windows PowerShell 5.1 与严苛模式安全判空，已克隆环境下支持直接重跑。
+- 安装成功后会生成 `skill-update-status.json`（`status: ok`），重启 Antigravity 即可生效。

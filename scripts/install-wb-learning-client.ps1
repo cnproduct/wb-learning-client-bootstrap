@@ -92,11 +92,11 @@ function Save-DeviceToken {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         $secure = Read-Host '请粘贴管理员签发的 43 位设备令牌（输入不会显示）' -AsSecureString
         $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-        try { $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer).Trim() }
+        try { $rawToken = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer); $token = if ($rawToken) { "$rawToken".Trim() } else { '' } }
         finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
         try {
             if ($token -cnotmatch '^[A-Za-z0-9_-]{43}$') {
-                Write-Warning "格式无效（第 $attempt/3 次）。请只复制令牌文本，不要复制 PS 提示符或整段命令。"
+                Write-Warning "格式无效（第 $attempt/3 次）。令牌应为严格 43 位英文字母/数字/下划线/减号。请只复制令牌文本，勿复制 '令牌：' 前缀、PS 提示符或 WB 店铺 API 密钥。"
                 continue
             }
             $payload = @{ endpoint = $endpoint; ingest_token = $token } | ConvertTo-Json
@@ -108,7 +108,7 @@ function Save-DeviceToken {
                 if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force }
             }
             try {
-                if ((Get-Clipboard -Raw -ErrorAction Stop).Trim() -ceq $token) { Set-Clipboard -Value ' ' }
+                $clip = Get-Clipboard -Raw -ErrorAction SilentlyContinue; if ($clip -and "$clip".Trim() -ceq $token) { Set-Clipboard -Value ' ' }
             } catch { }
             Step '设备令牌已保存到当前用户配置。'
             return
@@ -185,12 +185,14 @@ try {
             }
             Step '使用当前已解压的 WB Skill 文件。'
         } else {
-            $remote = (& $git -C $repoDirectory remote get-url origin).Trim()
+            $remoteRaw = & $git -C $repoDirectory remote get-url origin
+            $remote = if ($remoteRaw) { "$remoteRaw".Trim() } else { '' }
             if ($LASTEXITCODE -ne 0 -or $remote -notin @($repository, 'https://github.com/cnproduct/ozon-to-wb-fast-listing')) { throw '现有仓库来源不匹配，已停止。' }
-            $branch = (& $git -C $repoDirectory branch --show-current).Trim()
+            $branchRaw = & $git -C $repoDirectory branch --show-current
+            $branch = if ($branchRaw) { "$branchRaw".Trim() } else { '' }
             if ($branch -ne 'main') { throw "现有仓库分支不是 main：$branch" }
-            $dirty = (& $git -C $repoDirectory status --porcelain).Trim()
-            if ($dirty) { throw '现有仓库有本地改动，已停止以免覆盖。' }
+            $dirty = & $git -C $repoDirectory status --porcelain
+            if ($dirty -and "$dirty".Trim()) { throw '现有仓库有本地改动，已停止以免覆盖。' }
             Invoke-Git @('-C', $repoDirectory, 'fetch', '--quiet', 'origin', 'main')
             Invoke-Git @('-C', $repoDirectory, 'merge', '--ff-only', 'origin/main')
         }
