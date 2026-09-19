@@ -2,6 +2,8 @@
 
 在新的 64 位 Windows 电脑上安装 WB Skill 的学习规则同步与 Antigravity 自动更新。需要先安装 Antigravity，并准备管理员签发的 **43 位设备令牌**。设备令牌与 WB 店铺商业授权不同。
 
+本安装器也已内置在 [WB Fast Listing 主仓库](https://github.com/cnproduct/ozon-to-wb-fast-listing)及其受保护下载包中；从主仓库下载时，可直接双击根目录的 `install-wb-learning-client.cmd`。
+
 ## 直接运行
 
 1. 在本仓库页面选择 **Code → Download ZIP**，解压到本机。

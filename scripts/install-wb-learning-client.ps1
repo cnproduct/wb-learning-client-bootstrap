@@ -15,6 +15,24 @@ $configPath = Join-Path $learningDirectory 'hub-config.json'
 $skillDirectory = Join-Path $HOME '.gemini\config\skills\ozon-to-wb-fast-listing'
 $endpoint = 'https://wb-skill-learning-hub.cnproduct.workers.dev'
 
+# A copied WB Skill may contain this installer inside the directory that must be
+# backed up. Run from a temporary copy and leave that directory before moving it.
+if ($PSCommandPath) {
+    $activeScript = [IO.Path]::GetFullPath($PSCommandPath)
+    $targetPrefix = [IO.Path]::GetFullPath($skillDirectory).TrimEnd('\') + '\'
+    if ($activeScript.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        $stagedScript = Join-Path $env:TEMP ('wb-learning-bootstrap-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        Copy-Item -LiteralPath $activeScript -Destination $stagedScript
+        Set-Location $HOME
+        try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stagedScript
+            exit $LASTEXITCODE
+        } finally {
+            Remove-Item -LiteralPath $stagedScript -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Step([string]$message) { Write-Host "[WB 安装] $message" }
 function Refresh-Path {
     $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
@@ -147,18 +165,35 @@ try {
         if (-not $python) { throw 'Python 安装后仍无法找到 Python 3.10+。' }
     }
     Step "Python 就绪：$(& $python --version)"
+    if ((Test-Path -LiteralPath $repoDirectory) -and
+        -not (Test-Path -LiteralPath (Join-Path $repoDirectory '.git'))) {
+        $bundleRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
+        if ($bundleRoot -ieq [IO.Path]::GetFullPath($repoDirectory) -and
+            -not (Test-Path -LiteralPath (Join-Path $repoDirectory 'scripts\install_learning_rule_sync.py'))) {
+            $repoDirectory = Join-Path $HOME 'ozon-to-wb-fast-listing-managed-source'
+            Step '发布包不含学习同步源码，改从官方仓库取得安装脚本。'
+        }
+    }
     if (-not (Test-Path -LiteralPath $repoDirectory)) {
         Invoke-Git @('clone', '--branch', 'main', '--single-branch', $repository, $repoDirectory)
     } else {
-        if (-not (Test-Path -LiteralPath (Join-Path $repoDirectory '.git'))) { throw "现有目录不是 Git 仓库：$repoDirectory" }
-        $remote = (& $git -C $repoDirectory remote get-url origin).Trim()
-        if ($LASTEXITCODE -ne 0 -or $remote -notin @($repository, 'https://github.com/cnproduct/ozon-to-wb-fast-listing')) { throw '现有仓库来源不匹配，已停止。' }
-        $branch = (& $git -C $repoDirectory branch --show-current).Trim()
-        if ($branch -ne 'main') { throw "现有仓库分支不是 main：$branch" }
-        $dirty = (& $git -C $repoDirectory status --porcelain).Trim()
-        if ($dirty) { throw '现有仓库有本地改动，已停止以免覆盖。' }
-        Invoke-Git @('-C', $repoDirectory, 'fetch', '--quiet', 'origin', 'main')
-        Invoke-Git @('-C', $repoDirectory, 'merge', '--ff-only', 'origin/main')
+        if (-not (Test-Path -LiteralPath (Join-Path $repoDirectory '.git'))) {
+            $bundleRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
+            if ($bundleRoot -ine [IO.Path]::GetFullPath($repoDirectory) -or
+                -not (Test-Path -LiteralPath (Join-Path $repoDirectory 'scripts\install_learning_rule_sync.py'))) {
+                throw "现有目录不是 Git 仓库：$repoDirectory"
+            }
+            Step '使用当前已解压的 WB Skill 文件。'
+        } else {
+            $remote = (& $git -C $repoDirectory remote get-url origin).Trim()
+            if ($LASTEXITCODE -ne 0 -or $remote -notin @($repository, 'https://github.com/cnproduct/ozon-to-wb-fast-listing')) { throw '现有仓库来源不匹配，已停止。' }
+            $branch = (& $git -C $repoDirectory branch --show-current).Trim()
+            if ($branch -ne 'main') { throw "现有仓库分支不是 main：$branch" }
+            $dirty = (& $git -C $repoDirectory status --porcelain).Trim()
+            if ($dirty) { throw '现有仓库有本地改动，已停止以免覆盖。' }
+            Invoke-Git @('-C', $repoDirectory, 'fetch', '--quiet', 'origin', 'main')
+            Invoke-Git @('-C', $repoDirectory, 'merge', '--ff-only', 'origin/main')
+        }
     }
     foreach ($name in @('sync_learning_rules.py', 'install_learning_rule_sync.py')) {
         if (-not (Test-Path -LiteralPath (Join-Path $repoDirectory "scripts\$name"))) { throw "官方仓库缺少脚本：$name" }
