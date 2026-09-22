@@ -1,38 +1,37 @@
-# WB 学习客户端 Windows 一键安装
+# WB 上架与学习同步统一安装
 
-在新的 64 位 Windows 电脑上安装 WB Skill 的学习规则同步与 Antigravity 自动更新。需要先安装 Antigravity，并准备管理员签发的 **43 位设备令牌**。设备令牌与 WB 店铺商业授权不同。
+已并入 WB Fast Listing 云端客户端。主安装入口和本仓库使用同一个安装器。
+安装器自动准备缺失的 Python，交付 4 个允许分发的客户端文件，包含学习同步工具。
+不再安装 Git、克隆完整业务仓库或恢复旧更新 sidecar。
 
-本安装器也已内置在 [WB Fast Listing 主仓库](https://github.com/cnproduct/ozon-to-wb-fast-listing)及其受保护下载包中；从主仓库下载时，可直接双击根目录的 `install-wb-learning-client.cmd`。
+## Windows 安装
 
-## 直接运行
+先安装 Antigravity，在独立 PowerShell 中运行：
 
-1. 在本仓库页面选择 **Code → Download ZIP**，解压到本机。
-2. 双击解压目录中的 `install.cmd`。
-3. 安装器提示时，只粘贴设备令牌文本；输入不会显示。不要在 `PS C:\...>` 命令提示符后单独粘贴令牌。
-4. 看到“安装完成”后重启 Antigravity。
+```powershell
+$installer = Join-Path $env:TEMP 'wb-setup.ps1'
+Invoke-WebRequest -UseBasicParsing -Uri 'https://wb-private-executor.cnproduct.workers.dev/client/install.ps1' -OutFile $installer
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer
+Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+```
 
-安装器会检测并安装缺失的 Git/Python，从 `cnproduct/ozon-to-wb-fast-listing` 获取主分支，配置当前 Windows 用户的设备令牌、规则同步和每日 Skill 更新。旧版非 Git 管理的全局 WB Skill 会先移入 `~\.codex\wb-skill-learning\backups\`。已有仓库若包含本地改动，安装器会停止，以免覆盖文件。
+也可下载本仓库 ZIP、解压后双击 `install.cmd`。不要复制 PS 提示符或执行输出。
 
-## 在 Antigravity 中运行
+1. 安装器显示真实 Windows 用户 SID。
+2. 管理员在学习管理后台单独签发 43 位学习设备码；用户在第一个隐藏提示输入。在线验证通过后保存并同步已发布规则；没有规则时明确提示。
+3. 在 Antigravity 新建准备上架的窗口，取得真实窗口 ID。代理商或管理员从 [代理商平台](https://diytale.com/agent) 按窗口 ID 签发上架卡密；当前后台同时要求 SID。
+4. 用户输入该窗口 ID，并在第二个隐藏提示输入其独立上架卡密。只有服务器确认有效才显示授权成功。
 
-把本仓库文件夹放入 `%USERPROFILE%\.gemini\config\skills\wb-learning-client-bootstrap`，然后在 Antigravity 对话中要求运行 `wb-learning-client-bootstrap`。复制 Skill 文件夹本身不会自动执行脚本；令牌只在本机 PowerShell 的隐藏输入提示中粘贴，不发到聊天窗口。
+管理员与代理商在各自后台生成凭据，客户端不生成。未拿到码可回车跳过，稍后重新运行安装器。
+学习设备码、上架卡密和 WB 店铺令牌不能互换。自助免费试用（包括 1 天、2 天）均不提供。
+凭据只在 PowerShell 隐藏输入，不发到 Antigravity 对话，不写命令参数。
 
-安装器使用官方来源的 Git、Python 安装包，并在运行前检查 Windows 数字签名。脚本以 UTF-8 BOM 保存，兼容 Windows PowerShell 5.1。安装完成会检查 `skill-update-status.json` 与全局 Skill 文件。安装器不负责安装 Antigravity 应用本身，也不签发商业授权、绑定店铺或执行商品上架。
+## 更新与后续同步
 
-## 常见问题与排查指南
+安装完成后重启 Antigravity；旧窗口可能保留旧内容。每个新上架窗口独立激活。
+安装时会停用已知旧 WB 更新入口、备份旧安装和旧 WB 发布规则块，保留其他项目文件。
+学习规则在输入有效设备码时同步；后续可在对话中请求“同步学习规则”。不会自动上传原始对话。
+本次不安装定时后台服务；上架客户端在线检查会提示新版本。
 
-### 1. 设备令牌格式与输入技巧
-- **严格 43 位格式**：设备专属令牌（Device Ingest Token）仅包含大小写英文字母、数字、下划线 `_` 与减号 `-`（正则：`^[A-Za-z0-9_-]{43}$`）。
-- **请勿包含前后杂质**：请勿复制诸如 `令牌：`、`token=` 等文字标签，也不要复制 PowerShell 提示符（如 `PS C:\...>`）。
-- **与店铺 API 令牌区分**：设备令牌用于学习规则云端同步通道，**不是** Wildberries 店铺后台生成的长串 JWT API 密钥（`eyJ...` 开头），也**不是**商业店铺授权码。
-- **安全输入不回显**：终端提示输入令牌时，直接右键单击或按 `Ctrl+V` 粘贴并回车即可。出于安全保护，屏幕不会显示任何星号或字符。
-
-### 2. 幂等执行与重复运行保障
-- 安装脚本已通过 `Set-StrictMode -Version Latest` 严苛模式适配。
-- 支持在已克隆仓库的情况下安全重复重跑；工作区无任何本地改动时自动快进合并（`merge --ff-only`），绝不抛出 Null 对象调用异常。
-
-### 3. 安装完成验证
-安装完成后可查看本地状态配置验证就绪状态：
-- 配置文件：`%USERPROFILE%\.codex\wb-skill-learning\hub-config.json`
-- 状态记录：`%USERPROFILE%\.codex\wb-skill-learning\skill-update-status.json`（其中 `status` 字段应为 `ok`）
-- 看到“安装完成”后，请**完全退出并重启 Antigravity**以加载最新的受管 Skill 与后台更新服务。
+`skill-update-status.json` 的 `status: ok` 仅表示安装完成，不能当作授权或学习同步通过。
+静默更新可使用 `-SkipSetup`，凭据不会变更，也不会代替当前窗口授权检查。
