@@ -1,27 +1,26 @@
 ---
 name: wb-learning-client-bootstrap
-description: 在新 Windows 电脑安装管理员签发的 WB 规则学习客户端与 Antigravity 后台自动同步服务。适用于缺少 Python 或未配置设备令牌的新设备；运行随附 PowerShell 安装器并由用户在本机隐藏粘贴管理员签发的 43 位设备令牌。
+description: 在 Windows 安装独立学习客户端、核验管理员签发的 43 位学习服务令牌并登记规则检查服务。仅用于管理员学习同步安装和维护；无需上架卡密或窗口 ID。
 ---
 
-# WB 规则学习客户端 Windows 一键安装与同步
+# 独立学习客户端安装
 
-当用户要求在 Windows 上安装或配置 WB 规则学习同步客户端时，运行同目录的 [安装器](scripts/install-wb-learning-client.ps1)。
-
-本安装器专职负责 64 位 Windows 下的基础环境就绪与规则同步服务注入：
-1. 自动检测并安装缺失的 Python 3.10+ 环境；
-2. 交互式接收管理员签发的 **43 位设备令牌**（保存在 `%USERPROFILE%\.codex\wb-skill-learning\hub-config.json`）；
-3. 执行规则在线验证，拉取管理员最新发布的签名规则并注入全局 `GEMINI.md`；
-4. 注册 Antigravity 后台 `wb-skill-rules-sync` Sidecar 服务，实现后台每 15 分钟静默拉取最新规则。
-
-### 执行方式
-在新电脑上双击文件夹中的 `install.cmd`，或在 Windows PowerShell 中执行：
+让用户登录实际使用的 Windows 账户，在本机独立交互终端运行 `install.cmd`，或：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<本 Skill 目录>\scripts\install-wb-learning-client.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<本工具目录>\scripts\install-wb-learning-client.ps1"
 ```
 
-### 独立性与业务边界说明
-- **彻底独立于上架业务**：本安装器**仅负责学习规则同步与底座环境**，完全独立于 WB 上架业务。
-- **无需上架卡密**：本工具绝不要求输入上架卡密、不绑定 WB 店铺、不要求提供会话/窗口 ID (CID)，也不执行商品搬家上架。
-- **业务操作解耦**：若需开展 Wildberries 商品上架业务，请使用独立的 `ozon-to-wb-fast-listing` 技能。
-- **安全输入**：设备令牌严格为 43 位（`^[A-Za-z0-9_-]{43}$`），由用户在 PowerShell 隐藏输入提示处粘贴，输入时不显示字符。不要发到聊天窗口，不要放在命令行参数中。
+安装器准备 Python 3.10+；管理员签发的 43 位令牌仅在终端隐藏输入。令牌不能放在聊天、命令行参数或工具输出中。当前配置保存为用户目录中的 JSON，不能称为加密存储。
+
+根据实际输出分别报告：环境安装、令牌在线核验、规则下载状态、后台检查服务登记。
+- `distribution_disabled`：令牌核验有效，云端规则下载已关闭，没有下载新规则。
+- `no_release`：当前没有可下载的发布版本。
+- `updated` / `up_to_date`：规则已更新 / 已是当前发布版本。
+- 核验、网络或格式错误：报告未完成，不把错误或任意 HTTP 400 当作有效授权。
+
+云端当前关闭客户规则下载。服务每 15 分钟的调度配置不代表实际运行或即时远程控制。状态见 `.codex/wb-skill-learning/sync-status.json`；提示重启 Antigravity 后在本机核对实际执行。
+
+只维护本工具的令牌、同步服务与受管规则区块，保留其他全局内容。规则只用于允许公开的操作提醒；本地规则可以读取，不能承担核心算法保密或上架授权职责。
+
+本工具不要求上架卡密、会话 ID 或店铺绑定。上架请求转由独立的上架助手处理；本工具安装失败不改变上架授权。不得宣称设备令牌已具备硬件锁、自动分账或完整防复刻能力。

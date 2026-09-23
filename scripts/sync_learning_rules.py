@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 ROOT = Path.home() / ".codex/wb-skill-learning"
 CONFIG = ROOT / "hub-config.json"
 STATE = ROOT / "rules-state.json"
+STATUS = ROOT / "sync-status.json"
 GLOBAL_RULES = Path.home() / ".gemini/GEMINI.md"
 BACKUP = ROOT / "global-rules-backup.md"
 BEGIN = "<!-- WB-SKILL-PUBLISHED-RULES:BEGIN -->"
@@ -54,7 +55,7 @@ def load_config() -> tuple[str, str]:
     except (OSError, json.JSONDecodeError):
         raise SystemExit("集中规则配置无法读取") from None
     endpoint, token = value.get("endpoint", ""), value.get("ingest_token", "")
-    if not isinstance(endpoint, str) or not endpoint.startswith("https://") or not isinstance(token, str) or len(token) < 40:
+    if not isinstance(endpoint, str) or not endpoint.startswith("https://") or not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", token):
         raise SystemExit("集中规则配置不完整")
     return endpoint.rstrip("/"), token
 
@@ -68,15 +69,28 @@ def verify_token(endpoint: str, token: str) -> None:
     )
     try:
         with urlopen(request, timeout=20) as response:
-            return
+            result = json.load(response)
+            if isinstance(result, dict) and result.get("accepted") == 0 and result.get("duplicate") == 0:
+                return
+            raise SystemExit("设备令牌校验响应无效，请联系管理员")
     except HTTPError as error:
         if error.code == 400:
-            return
+            try:
+                result = json.loads(error.read(4096))
+            except (ValueError, OSError):
+                result = {}
+            # The official ingest handler authenticates before rejecting an empty batch.
+            if result == {"error": "invalid_batch"}:
+                return
         if error.code == 401:
             raise SystemExit("设备令牌无效或已被管理员撤销，请联系管理员")
         raise SystemExit(f"云端鉴权网关异常：HTTP {error.code}")
-    except (URLError, TimeoutError):
-        raise SystemExit("无法连接云端学习网关，请检查网络连接")
+    except (URLError, TimeoutError, ValueError):
+        raise SystemExit("无法确认设备令牌状态，请检查网络或联系管理员")
+
+
+class DistributionDisabled(Exception):
+    pass
 
 
 def fetch_release(endpoint: str, token: str) -> dict | None:
@@ -86,11 +100,15 @@ def fetch_release(endpoint: str, token: str) -> dict | None:
     )
     try:
         with urlopen(request, timeout=20) as response:
-            if response.status in (204, 410):
+            if response.status == 410:
+                raise DistributionDisabled
+            if response.status == 204:
                 return None
             envelope = json.load(response)
     except HTTPError as error:
-        if error.code in (204, 410):
+        if error.code == 410:
+            raise DistributionDisabled from None
+        if error.code == 204:
             return None
         raise SystemExit("集中规则同步失败，请联系运营超级管理员") from None
     except (URLError, TimeoutError, json.JSONDecodeError):
@@ -175,15 +193,31 @@ def install_release(release: dict) -> bool:
     return True
 
 
-def main() -> None:
+def sync_once() -> None:
     endpoint, token = load_config()
     verify_token(endpoint, token)
     print("设备令牌在线核验成功：状态有效活跃。")
-    release = fetch_release(endpoint, token)
+    try:
+        release = fetch_release(endpoint, token)
+    except DistributionDisabled:
+        atomic_write(STATUS, json.dumps({"status":"distribution_disabled","token_verified":True}) + "\n")
+        print("设备令牌有效；云端已关闭客户端规则下载，本次没有下载或更新规则。")
+        return
     if release and install_release(release):
-        print(f"WB Skill 规则已更新至版本 {release['version']}；已打开的对话将在后续规则加载时生效。")
+        state = "updated"
+        print(f"规则已更新至版本 {release['version']}；已打开的对话将在后续规则加载时生效。")
     else:
-        print("云端防复刻规则保护模式已就绪，当前规则版本正常。")
+        state = "up_to_date" if release else "no_release"
+        print("规则已是当前发布版本。" if release else "设备令牌有效；云端暂无可下载规则。")
+    atomic_write(STATUS, json.dumps({"status":state,"token_verified":True}) + "\n")
+
+
+def main() -> None:
+    try:
+        sync_once()
+    except SystemExit:
+        atomic_write(STATUS, json.dumps({"status":"check_failed","token_verified":None}) + "\n")
+        raise
 
 
 if __name__ == "__main__":
