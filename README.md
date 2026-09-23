@@ -26,6 +26,7 @@
 
 学习服务撤销只影响学习访问，上架卡密的有效期和撤销由独立商业授权服务管理。两个系统不以彼此的凭据作为前置条件。
 
-## 校验
+## 校验与兼容性
 
-运行 `python tests/check_sync.py` 验证令牌校验失败关闭、410 状态、签名校验和受管区块更新。Windows 安装和宿主后台调度需在目标 Windows 用户账户实测。
+- 运行 `python tests/check_sync.py` 验证令牌校验失败关闭、410 状态、签名校验、受管区块更新以及 PowerShell 脚本 UTF-8 BOM 签名。
+- **Windows PowerShell 5.1 编码兼容**：中文版 Windows（默认代码页 CP936 / GBK）下，`powershell.exe` 若读取无 BOM 的 UTF-8 脚本会按 ANSI 解码并导致语法解析错误（`TerminatorExpectedAtEndOfString`）。本仓库 `scripts/install-wb-learning-client.ps1` 严格保留 UTF-8 BOM，确保在所有中文 Windows 终端及双击 `install.cmd` 时稳定执行。

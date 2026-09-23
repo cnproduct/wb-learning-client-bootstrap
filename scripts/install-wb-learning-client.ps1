@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 Run from Windows PowerShell:
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-wb-learning-client.ps1

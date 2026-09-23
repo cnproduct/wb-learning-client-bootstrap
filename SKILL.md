@@ -11,7 +11,7 @@ description: 在 Windows 安装独立学习客户端、核验管理员签发的 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<本工具目录>\scripts\install-wb-learning-client.ps1"
 ```
 
-安装器准备 Python 3.10+；管理员签发的 43 位令牌仅在终端隐藏输入。令牌不能放在聊天、命令行参数或工具输出中。当前配置保存为用户目录中的 JSON，不能称为加密存储。
+安装器准备 Python 3.10+（`install-wb-learning-client.ps1` 必须带 UTF-8 BOM 以兼容中文版 Windows PowerShell 5.1/CP936 语法解析）；管理员签发的 43 位令牌仅在终端隐藏输入。令牌不能放在聊天、命令行参数或工具输出中。当前配置保存为用户目录中的 JSON，不能称为加密存储。
 
 根据实际输出分别报告：环境安装、令牌在线核验、规则下载状态、后台检查服务登记。
 - `distribution_disabled`：令牌核验有效，云端规则下载已关闭，没有下载新规则。
