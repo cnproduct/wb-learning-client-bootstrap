@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
 Run from Windows PowerShell:
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-wb-learning-client.ps1
@@ -20,8 +20,12 @@ function Refresh-Path {
     $env:Path = "$machine;$user;$env:Path"
 }
 function Find-Executable([string]$name, [string[]]$locations) {
-    $command = Get-Command $name -ErrorAction SilentlyContinue
-    if ($command -and $command.Source) { return $command.Source }
+    $commands = Get-Command $name -All -ErrorAction SilentlyContinue |
+        Where-Object { $_.Source -notlike '*\WindowsApps\*' }
+    if ($commands) {
+        $first = $commands | Select-Object -First 1
+        if ($first -and $first.Source) { return $first.Source }
+    }
     foreach ($location in $locations) {
         if ($location -and (Test-Path -LiteralPath $location -PathType Leaf)) { return $location }
     }
@@ -113,6 +117,24 @@ function Enable-Utf8Sidecars {
         }
     }
 }
+function Sync-SkillDirectory {
+    $currentRoot = [IO.Path]::GetFullPath((Join-Path $scriptsRoot '..'))
+    $targetRoot = [IO.Path]::GetFullPath((Join-Path $HOME '.gemini\config\skills\wb-learning-client-bootstrap'))
+    if ($currentRoot -ne $targetRoot) {
+        Step '正在同步学习客户端至 Antigravity 全局技能目录...'
+        New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
+        foreach ($file in @('SKILL.md', 'README.md', 'install.cmd')) {
+            $src = Join-Path $currentRoot $file
+            if (Test-Path -LiteralPath $src -PathType Leaf) {
+                Copy-Item -LiteralPath $src -Destination (Join-Path $targetRoot $file) -Force
+            }
+        }
+        $targetScripts = Join-Path $targetRoot 'scripts'
+        New-Item -ItemType Directory -Path $targetScripts -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $scriptsRoot '*') -Destination $targetScripts -Recurse -Force
+        Step '已就绪：Antigravity 可自动识别并调用 wb-learning-client-bootstrap 技能。'
+    }
+}
 
 try {
     if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) { throw '需要 64 位 Windows。' }
@@ -152,6 +174,7 @@ try {
     & $python -X utf8 $installScript
     if ($LASTEXITCODE -ne 0) { throw 'Antigravity 规则更新 Sidecar 安装失败。' }
     Enable-Utf8Sidecars
+    Sync-SkillDirectory
 
     Step '安装成功！'
     Step '后台检查服务已登记（每 15 分钟）；规则是否可下载，以刚才的在线检查结果为准。'

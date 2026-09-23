@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
@@ -194,13 +195,14 @@ def install_release(release: dict) -> bool:
 
 
 def sync_once() -> None:
+    now = datetime.now(timezone.utc).isoformat()
     endpoint, token = load_config()
     verify_token(endpoint, token)
     print("设备令牌在线核验成功：状态有效活跃。")
     try:
         release = fetch_release(endpoint, token)
     except DistributionDisabled:
-        atomic_write(STATUS, json.dumps({"status":"distribution_disabled","token_verified":True}) + "\n")
+        atomic_write(STATUS, json.dumps({"status": "distribution_disabled", "token_verified": True, "checked_at": now}) + "\n")
         print("设备令牌有效；云端已关闭客户端规则下载，本次没有下载或更新规则。")
         return
     if release and install_release(release):
@@ -209,14 +211,15 @@ def sync_once() -> None:
     else:
         state = "up_to_date" if release else "no_release"
         print("规则已是当前发布版本。" if release else "设备令牌有效；云端暂无可下载规则。")
-    atomic_write(STATUS, json.dumps({"status":state,"token_verified":True}) + "\n")
+    atomic_write(STATUS, json.dumps({"status": state, "token_verified": True, "checked_at": now}) + "\n")
 
 
 def main() -> None:
+    now = datetime.now(timezone.utc).isoformat()
     try:
         sync_once()
     except SystemExit:
-        atomic_write(STATUS, json.dumps({"status":"check_failed","token_verified":None}) + "\n")
+        atomic_write(STATUS, json.dumps({"status": "check_failed", "token_verified": None, "checked_at": now}) + "\n")
         raise
 
 
