@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 Run from Windows PowerShell:
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-wb-learning-client.ps1
@@ -93,7 +93,7 @@ function Save-DeviceToken {
                 $clip = Get-Clipboard -Raw -ErrorAction SilentlyContinue
                 if ($clip -and "$clip".Trim() -ceq $token) { Set-Clipboard -Value ' ' }
             } catch { }
-            Step '设备令牌已安全保存至当前用户配置。'
+            Step '设备令牌已保存至当前用户配置，请勿分享该配置文件。'
             return
         } finally {
             $token = $null
@@ -154,7 +154,7 @@ try {
     Enable-Utf8Sidecars
 
     Step '安装成功！'
-    Step '规则同步服务已就绪（后台每 15 分钟静默拉取管理员发布的签名规则）。'
+    Step '后台检查服务已登记（每 15 分钟）；规则是否可下载，以刚才的在线检查结果为准。'
     Step '请完全退出并重启 Antigravity 以加载最新的全局规则与后台服务。'
 } catch {
     Write-Error "WB 学习客户端安装未完成：$($_.Exception.Message)"
