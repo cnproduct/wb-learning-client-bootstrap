@@ -1,37 +1,33 @@
-# WB 上架与学习同步统一安装
+# WB 规则学习客户端 Windows 一键安装
 
-已并入 WB Fast Listing 云端客户端。主安装入口和本仓库使用同一个安装器。
-安装器自动准备缺失的 Python，交付 4 个允许分发的客户端文件，包含学习同步工具。
-不再安装 Git、克隆完整业务仓库或恢复旧更新 sidecar。
+在新的 64 位 Windows 电脑上安装 WB 规则学习同步客户端与 Antigravity 后台自动同步。需要准备管理员签发的 **43 位设备令牌**。
 
-## Windows 安装
+> [!NOTE]
+> **设备令牌与 WB 店铺商业授权完全解耦**：
+> 设备令牌用于设备级规则同步通道，**不是**代理商签发的窗口上架卡密，也**不是** Wildberries 店铺后台的 API Token。安装本客户端无需准备上架卡密或绑定店铺。
 
-先安装 Antigravity，在独立 PowerShell 中运行：
+---
 
-```powershell
-$installer = Join-Path $env:TEMP 'wb-setup.ps1'
-Invoke-WebRequest -UseBasicParsing -Uri 'https://wb-private-executor.cnproduct.workers.dev/client/install.ps1' -OutFile $installer
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer
-Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
-```
+## 快速使用
 
-也可下载本仓库 ZIP、解压后双击 `install.cmd`。不要复制 PS 提示符或执行输出。
+1. 在本仓库页面选择 **Code → Download ZIP** 并解压至本机。
+2. 双击解压目录中的 `install.cmd`。
+3. 终端提示时，粘贴管理员签发的 43 位设备令牌（出于安全保护输入不会回显）。
+4. 提示“安装成功”后，完全重启 Antigravity 即可生效。
 
-1. 安装器显示真实 Windows 用户 SID。
-2. 管理员在学习管理后台单独签发 43 位学习设备码；用户在第一个隐藏提示输入。在线验证通过后保存并同步已发布规则；没有规则时明确提示。
-3. 在 Antigravity 新建准备上架的窗口，取得真实窗口 ID。代理商或管理员从 [代理商平台](https://diytale.com/agent) 按窗口 ID 签发上架卡密；当前后台同时要求 SID。
-4. 用户输入该窗口 ID，并在第二个隐藏提示输入其独立上架卡密。只有服务器确认有效才显示授权成功。
+---
 
-管理员与代理商在各自后台生成凭据，客户端不生成。未拿到码可回车跳过，稍后重新运行安装器。
-学习设备码、上架卡密和 WB 店铺令牌不能互换。自助免费试用（包括 1 天、2 天）均不提供。
-凭据只在 PowerShell 隐藏输入，不发到 Antigravity 对话，不写命令参数。
+## 安装器核心能力
 
-## 更新与后续同步
+- **环境检测**：自动检测官方 Python 3.10+，若缺失则静默下载并安装官方安全安装包；
+- **配置持久化**：将设备专属令牌加密保存在 `%USERPROFILE%\.codex\wb-skill-learning\hub-config.json`；
+- **签名规则验证**：连接云端验证网关，拉取管理员最新发布的 HMAC-SHA256 签名规则并安全写入全局 `GEMINI.md`；
+- **Sidecar 后台自动化**：注册 Antigravity 后台 `wb-skill-rules-sync` 调度服务，每 15 分钟静默检测并同步最新云端防错规则。
 
-安装完成后重启 Antigravity；旧窗口可能保留旧内容。每个新上架窗口独立激活。
-安装时会停用已知旧 WB 更新入口、备份旧安装和旧 WB 发布规则块，保留其他项目文件。
-学习规则在输入有效设备码时同步；后续可在对话中请求“同步学习规则”。不会自动上传原始对话。
-本次不安装定时后台服务；上架客户端在线检查会提示新版本。
+---
 
-`skill-update-status.json` 的 `status: ok` 仅表示安装完成，不能当作授权或学习同步通过。
-静默更新可使用 `-SkipSetup`，凭据不会变更，也不会代替当前窗口授权检查。
+## 验证与排查
+
+- **验证配置文件**：`%USERPROFILE%\.codex\wb-skill-learning\hub-config.json`
+- **验证已生效规则**：打开 `%USERPROFILE%\.gemini\GEMINI.md`，可看到 `<!-- WB-SKILL-PUBLISHED-RULES:BEGIN -->` 区块已成功注入。
+- **与上架技能的关系**：安装完成后，若需执行商品上架业务，请在 Antigravity 中运行独立的 `ozon-to-wb-fast-listing` 技能。
