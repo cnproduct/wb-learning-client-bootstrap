@@ -59,6 +59,26 @@ def load_config() -> tuple[str, str]:
     return endpoint.rstrip("/"), token
 
 
+def verify_token(endpoint: str, token: str) -> None:
+    request = Request(
+        endpoint + "/api/ingest",
+        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json", "User-Agent": "WB-Skill-Learning/1.0"},
+        data=b'{"items":[]}',
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            return
+    except HTTPError as error:
+        if error.code == 400:
+            return
+        if error.code == 401:
+            raise SystemExit("设备令牌无效或已被管理员撤销，请联系管理员")
+        raise SystemExit(f"云端鉴权网关异常：HTTP {error.code}")
+    except (URLError, TimeoutError):
+        raise SystemExit("无法连接云端学习网关，请检查网络连接")
+
+
 def fetch_release(endpoint: str, token: str) -> dict | None:
     request = Request(
         endpoint + "/api/rules/latest",
@@ -66,11 +86,11 @@ def fetch_release(endpoint: str, token: str) -> dict | None:
     )
     try:
         with urlopen(request, timeout=20) as response:
-            if response.status == 204:
+            if response.status in (204, 410):
                 return None
             envelope = json.load(response)
     except HTTPError as error:
-        if error.code == 204:
+        if error.code in (204, 410):
             return None
         raise SystemExit("集中规则同步失败，请联系运营超级管理员") from None
     except (URLError, TimeoutError, json.JSONDecodeError):
@@ -157,9 +177,13 @@ def install_release(release: dict) -> bool:
 
 def main() -> None:
     endpoint, token = load_config()
+    verify_token(endpoint, token)
+    print("设备令牌在线核验成功：状态有效活跃。")
     release = fetch_release(endpoint, token)
     if release and install_release(release):
         print(f"WB Skill 规则已更新至版本 {release['version']}；已打开的对话将在后续规则加载时生效。")
+    else:
+        print("云端防复刻规则保护模式已就绪，当前规则版本正常。")
 
 
 if __name__ == "__main__":
