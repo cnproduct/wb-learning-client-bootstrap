@@ -106,17 +106,6 @@ function Save-DeviceToken {
     }
     throw '三次输入均无效；请重新运行安装器。'
 }
-function Enable-Utf8Sidecars {
-    $path = Join-Path $HOME ".gemini\config\sidecars\wb-skill-rules-sync\sidecar.json"
-    if (Test-Path -LiteralPath $path -PathType Leaf) {
-        $sidecar = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
-        $arguments = @($sidecar.args)
-        if ($arguments.Count -ge 3 -and $arguments[2] -ne '-X') {
-            $sidecar.args = @($arguments[0], $arguments[1], '-X', 'utf8') + @($arguments[2..($arguments.Count - 1)])
-            [IO.File]::WriteAllText($path, ($sidecar | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
-        }
-    }
-}
 function Sync-SkillDirectory {
     $currentRoot = [IO.Path]::GetFullPath((Join-Path $scriptsRoot '..'))
     $targetRoot = [IO.Path]::GetFullPath((Join-Path $HOME '.gemini\config\skills\wb-learning-client-bootstrap'))
@@ -131,7 +120,9 @@ function Sync-SkillDirectory {
         }
         $targetScripts = Join-Path $targetRoot 'scripts'
         New-Item -ItemType Directory -Path $targetScripts -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $scriptsRoot '*') -Destination $targetScripts -Recurse -Force
+        Get-ChildItem -LiteralPath $scriptsRoot -File | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $targetScripts -Force
+        }
         Step '已就绪：Antigravity 可自动识别并调用 wb-learning-client-bootstrap 技能。'
     }
 }
@@ -170,15 +161,15 @@ try {
         if ($LASTEXITCODE -ne 0) { throw '设备令牌验证或规则同步失败；请核对令牌与网络连接。' }
     }
 
-    Step '安装 Antigravity 规则自动更新后台 Sidecar 服务...'
-    & $python -X utf8 $installScript
-    if ($LASTEXITCODE -ne 0) { throw 'Antigravity 规则更新 Sidecar 安装失败。' }
-    Enable-Utf8Sidecars
     Sync-SkillDirectory
+    Step '登记当前 Windows 用户的规则同步计划任务，并迁移旧 WB 调度器...'
+    & $python -X utf8 $installScript
+    if ($LASTEXITCODE -ne 0) { throw 'Windows 计划任务登记或旧调度器迁移未完成，请检查上方错误。' }
 
     Step '安装成功！'
-    Step '后台检查服务已登记（每 15 分钟）；规则是否可下载，以刚才的在线检查结果为准。'
-    Step '请完全退出并重启 Antigravity 以加载最新的全局规则与后台服务。'
+    Step '规则检查计划任务已登记（每 15 分钟，仅当前用户登录期间运行，无需保持 Antigravity 打开）。'
+    Step '旧用户请保存工作、退出 Antigravity，并注销 Windows 后重新登录一次，释放旧会话进程。'
+    Step '请在任务计划程序核对执行结果，并检查 sync-status.json 的 checked_at；登记不等于运行成功。'
 } catch {
     Write-Error "WB 学习客户端安装未完成：$($_.Exception.Message)"
     exit 1
